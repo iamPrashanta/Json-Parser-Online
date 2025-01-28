@@ -21,8 +21,11 @@
     const output = document.getElementById('json-output');
 
     function syntaxHighlight(json) {
-        json = json.replace(/([{}])/g, '<span class="brace">$1</span>'); // Braces {}
-        json = json.replace(/([\[\]])/g, '<span class="bracket">$1</span>'); // Brackets []
+        json = json.replace(/([+])/g, ' '); // Remove +
+        json = json.replace(/([{])/g, '<span class="brace toggle">$1 <span title="close">#</span></span>'); // Braces {
+        json = json.replace(/([}])/g, '<span class="brace toggle">$1</span>'); // Braces }
+        json = json.replace(/([\[])/g, '<span class="bracket toggle">$1 <span title="close">#</span></span>'); // Brackets [
+        json = json.replace(/([\]])/g, '<span class="bracket toggle">$1</span>'); // Brackets ]
         json = json.replace(/"([^"]+)":/g, '<span class="property">"$1"</span>:'); // Keys
         json = json.replace(/"([^"]*)",/g, '<span class="string">"$1"</span>'); // Strings
         json = json.replace(/\b(true|false|null)\b/g, '<span class="null">$1</span>'); // Booleans and null
@@ -30,26 +33,96 @@
         return json;
     }
 
-    input.addEventListener('input', () => {
-    try {
-        let rawInput = input.value.trim();
-        if (
-        rawInput.startsWith('"') &&
-        rawInput.endsWith('"') &&
-        rawInput.includes('\\"')
-        ) {
-        rawInput = JSON.parse(rawInput);
+    function highlightErrorPart(json, error) {
+        const errorIndex = error.message.match(/position (\d+)/)?.[1];
+        if (errorIndex) {
+            const beforeError = json.slice(0, errorIndex);
+            const afterError = json.slice(errorIndex);
+            const errorPartMatch = afterError.match(/.*?[\s,\]}]/);
+            const errorPart = errorPartMatch ? errorPartMatch[0] : afterError;
+
+            return (
+                syntaxHighlight(beforeError) +
+                `<span class="error">${errorPart}</span>` +
+                syntaxHighlight(afterError.slice(errorPart.length))
+            );
+        }
+        return syntaxHighlight(json);
+    }
+
+    function findErrorPart(json) {
+        // Check if json is not a string, and if so, convert it to a string
+        if (typeof json !== 'string') {
+            json = JSON.stringify(json);
         }
 
-        const parsedJson = JSON.parse(rawInput);
-        const formattedJson = JSON.stringify(parsedJson, null, 2);
-        const highlightedJson = syntaxHighlight(formattedJson); // Apply Syntax Highlighting
-        output.innerHTML = highlightedJson;
-        console.log(formattedJson);
-        console.log(highlightedJson);
-    } catch (e) {
-        output.textContent = 'Invalid JSON';
+        let lastQuoteIndex = json.lastIndexOf('"');
+        if (lastQuoteIndex !== -1) {
+            const remainingPart = json.slice(lastQuoteIndex + 1).trim();
+            const errorEndIndex = remainingPart.search(/[}\]]/);
+            const errorPart =
+                errorEndIndex !== -1
+                    ? remainingPart.slice(0, errorEndIndex + 1)
+                    : remainingPart;
+            return json.slice(lastQuoteIndex, lastQuoteIndex + errorPart.length + 1);
+        }
+        return null;
     }
+
+
+    function countMismatches(json) {
+        const counts = {
+            braces: { open: 0, close: 0 },
+            brackets: { open: 0, close: 0 },
+            quotes: 0
+        };
+
+        for (const char of json) {
+            if (char === '{') counts.braces.open++;
+            if (char === '}') counts.braces.close++;
+            if (char === '[') counts.brackets.open++;
+            if (char === ']') counts.brackets.close++;
+            if (char === '"') counts.quotes++;
+        }
+
+        return counts;
+    }
+
+    input.addEventListener('input', () => {
+        let rawInput = input.value.trim();
+        const counts = countMismatches(rawInput);
+        console.log(counts);
+        if (
+            counts.braces.open !== counts.braces.close ||
+            counts.brackets.open !== counts.brackets.close ||
+            counts.quotes % 2 !== 0
+        ) {
+            const errorPart = findErrorPart(input);
+            console.log("Problematic part of JSON:", errorPart);
+        }
+
+        try {
+
+            // Check if the input is URL-encoded and decode it
+            if (decodeURIComponent(rawInput) !== rawInput) {
+                rawInput = decodeURIComponent(rawInput);
+            }
+
+            if (
+                rawInput.startsWith('"') &&
+                rawInput.endsWith('"') &&
+                rawInput.includes('\\"')
+            ) {
+                rawInput = JSON.parse(rawInput);
+            }
+
+            const parsedJson = JSON.parse(rawInput);
+            const formattedJson = JSON.stringify(parsedJson, null, 2);
+            const highlightedJson = syntaxHighlight(formattedJson); // Apply Syntax Highlighting
+            output.innerHTML = highlightedJson;
+        } catch (e) {
+            output.innerHTML = highlightErrorPart(input.value, e);
+        }
     });
 
   </script>
