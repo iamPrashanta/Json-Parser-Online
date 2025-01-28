@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Json Parser Online</title>
+  <meta content="width=device-width, initial-scale=1, user-scalable=1, minimum-scale=1, maximum-scale=5" name="viewport">
+  <meta name="description" content="A free tool for Analyzing your JSON string as you type with an online Javascript parser, featuring tree view and syntax highlighting. Processing is done on locally: no data send to server.">
+  <meta name="author" content="prashanta mondal">
+  <link rel="publisher" href="https://github.com/iamPrashanta">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="container">
+    <textarea id="json-input" placeholder="Paste your JSON here..."></textarea>
+    <pre id="json-output">{}</pre>
+  </div>
+
+  <script>
+    const input = document.getElementById('json-input');
+    const output = document.getElementById('json-output');
+
+    function syntaxHighlight(json) {
+        json = json.replace(/([{}])/g, '<span class="brace">$1</span>'); // Braces {}
+        json = json.replace(/([\[\]])/g, '<span class="bracket">$1</span>'); // Brackets []
+        json = json.replace(/"([^"]+)":/g, '<span class="property">"$1"</span>:'); // Keys
+        json = json.replace(/"([^"]*)",/g, '<span class="string">"$1"</span>'); // Strings
+        json = json.replace(/\b(true|false|null)\b/g, '<span class="null">$1</span>'); // Booleans and null
+        json = json.replace(/(?<!")\b(-?\d+(\.\d+)?(e[+-]?\d+)?)\b(?!")/gi, '<span class="number">$1</span>'); // Numbers not in quotes
+        return json;
+    }
+
+    input.addEventListener('input', () => {
+    try {
+        let rawInput = input.value.trim();
+        if (
+        rawInput.startsWith('"') &&
+        rawInput.endsWith('"') &&
+        rawInput.includes('\\"')
+        ) {
+        rawInput = JSON.parse(rawInput);
+        }
+
+        const parsedJson = JSON.parse(rawInput);
+        const formattedJson = JSON.stringify(parsedJson, null, 2);
+        const highlightedJson = syntaxHighlight(formattedJson); // Apply Syntax Highlighting
+        output.innerHTML = highlightedJson;
+        console.log(formattedJson);
+        console.log(highlightedJson);
+    } catch (e) {
+        output.textContent = 'Invalid JSON';
+    }
+    });
+
+  </script>
+</body>
+</html>
